@@ -106,7 +106,8 @@ nmd_md <- escalc(measure = "MD", m1i = m1i, sd1i = sd1i, n1i = n1i, m2i = m2i, s
 # MD의 역분산가중치 통합추정치 계산 Random-Effects Model Analysis
 rma(yi, vi, data = nmd_md, method = "FE")
 # 가설검정 H0:θF=0 (θ는 효과 크기) Fixed effects model = FE
-# Cochran's Q-test 
+# Cochran's Q-test H0 = 모든 개별 연구의 효과크기는 동일
+# I^2 : 통계적 이질성을 나타내는 통계량
 # 이분산성이다 = 효과크기가 다르다 -> 회귀분석으로 따지면 yhat들의 분산이 고르지 않고 제각각이다 즉, 효과크기가 존재한다.
 
 data(dat.bcg)
@@ -151,3 +152,67 @@ bcg_lnOR <- escalc(measure = "OR", ai = tpos, bi = tneg, ci = cpos, di = cneg, d
 # ln(OR)의 역분산가중치 통합추정치 계산 Random-Effects Model Analysis
 rma(yi, vi, data = bcg_lnOR, method = "DL")
 
+
+
+#### 5. 통계적 이질성
+## 5.1 통계적 이질성 평가
+# 5.1.1 숲그림
+data(dat.bcg)
+bcg <- dat.bcg
+
+bcg_lnOR <- escalc(measure = "OR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, append = TRUE)
+bcg_rma <- rma(yi, vi, data = bcg_lnOR, method = "DL")
+
+forest(bcg_rma, xlim = c(-16, 6), at = log(c(.05, .25, 1, 4)), atransf = exp, ilab = cbind(bcg$tpos, bcg$tneg, bcg$cpos, bcg$cneg), ilab.xpos = c(-10, -8, -6, -4), cex = 1, ylim = c(-1, 27), order = order(bcg$alloc), rows = c(3:4, 9:15, 20:23), xlab = "Relative Risk", mlab = "RE Model for All studies")
+
+# 5.1.2 통계적 이질성 검토를 위한 통계량
+data(dat.bcg)
+bcg <- dat.bcg
+rma(measure = "OR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL") %>% summary() 
+# Cochran's Q-test H0 = 모든 개별 연구의 효과크기는 동일
+# I^2 : 통계적 이질성을 나타내는 통계량
+# H^2 Q통계량과 자유도의 비로 정의, H > 1 경우 설명할 수 없는 이질성이 있다고 판단 H^2 = Q/(k-1)
+# tau : T 통계량, tau^2 : T^2 통계량 // 효과크기의 연구간 변동을 나타내는 분산 tau^2, tau의 추정량이 T^2, T 
+rma(measure = "OR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL") %>% confint()
+
+## 5.2 하위그룹분석
+data(dat.bcg)
+bcg <- dat.bcg
+
+rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL", subset = (alloc == "systematic")) %>% summary()
+
+rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL", subset = (alloc == "random")) %>% summary()
+
+rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL", subset = (alloc == "alternate")) %>% summary()
+
+rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL", slab = paste(author, year, sep = ",")) %>% 
+forest(xlim = c(-16, 6), at = log(c(.05, .25, 1, 4)), atransf = exp,
+       ilab = cbind(bcg$tpos, bcg$tneg, bcg$cpos, bcg$cneg),
+       ilab.xpos = c(-9.5, -8, -6, -4), cex = .75, ylim = c(-1, 27),
+       order = order(bcg$alloc), rows= c(3:4, 9:15, 20:23),
+       xlab = "Relative Risk", mlab = "RE Model for all studies")
+
+## 5.3 메타회귀분석
+## 5.3.1 고정효과 메타회귀모형
+data(dat.bcg)
+bcg <- dat.bcg
+
+rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "FE", mods = ablat, intercept = TRUE) %>% summary()
+# Fixed effects model = FE
+# ablat : 위도
+# Cochran's Q-test H0 = 모든 개별 연구의 효과크기는 동일
+# Test of Moderators <- 모형 
+# 추정된 모형 ln(RR) = 0.3436 + (-0.0292)*mods(위도)
+
+## 5.3.2 랜덤효과 메타회귀모형
+rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL", mods = ablat, intercept = TRUE) %>% summary()
+# Test for Residual Heterogeneity 영가설: 모형으로 설명이 안되는 분산 = 0
+# Test of Moderators 영가설 : 모든 회귀계수 = 0
+# 추정된 모형 ln(RR) = (-0.0292)*mods(위도)
+# I^2 : 통계적 이질성을 나타내는 통계량
+# H^2 Q통계량과 자유도의 비로 정의, H > 1 경우 설명할 수 없는 이질성이 있다고 판단 H^2 = Q/(k-1)
+# tau : T 통계량, tau^2 : T^2 통계량 // 효과크기의 연구간 변동을 나타내는 분산 tau^2, tau의 추정량이 T^2, T 
+rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL", mods = ~ ablat + year, intercept = TRUE) %>% influence()
+
+rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL", mods = ~ ablat + year, intercept = TRUE) %>% influence() %>% 
+  plot()
