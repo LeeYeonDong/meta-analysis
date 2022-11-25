@@ -216,3 +216,65 @@ rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, meth
 
 rma(measure = "RR", ai = tpos, bi = tneg, ci = cpos, di = cneg, data = bcg, method = "DL", mods = ~ ablat + year, intercept = TRUE) %>% influence() %>% 
   plot()
+
+
+#### 6. 출판 삐둘림
+## 6.1 출판 삐둘림 평가
+# 6.1.1 깔때기 그림
+data(dat.hackshaw1998)
+hs <- dat.hackshaw1998
+
+rma(yi = yi, vi = vi, data = hs, measure = "OR", method = "FE")
+# 가설검정 H0:θF=0 (θ는 효과 크기) Fixed effects model = FE
+# I^2 : 통계적 이질성을 나타내는 통계량
+# H^2 Q통계량과 자유도의 비로 정의, H > 1 경우 설명할 수 없는 이질성이 있다고 판단 H^2 = Q/(k-1)
+rma(yi = yi, vi = vi, data = hs, measure = "OR", method = "FE") %>% funnel(atransf = exp, xlab = "Odds Ratio", at = log(c(.25, .5, 1, 2, 4)))
+# y축 : 표본크기 또는 표준오차, 위 방향으로 표본크기가 증가하거나 표준오차가 감소
+# x축 : 효과크기
+
+rma(yi = yi, vi = vi, data = hs, measure = "OR", method = "FE") %>% funnel(atransf = exp, xlab = "Odds Ratio", at = log(c(.25, .5, 1, 2, 4)), level = c(90,95,99), shade = c("white", "grey", "darkgray"), refline = 0)
+
+rma(yi = yi, vi = vi, data = hs, measure = "OR", method = "FE") %>% funnel(atransf = exp, xlab = "Odds Ratio", at = log(c(.25, .5, 1, 2, 4)), level = c(90,95,99), shade = c("white", "grey", "darkgray"), refline = 0, yaxis = "seinv")
+# yaxis = "seinv" <- 표준오차의 역수를 Y축으로 se -> se^-1
+
+# 6.1.2 베그 검정
+data(dat.hackshaw1998)
+hs <- dat.hackshaw1998
+
+res <- rma(yi = yi, vi = vi, data = hs, measure = "OR", method = "FE") 
+ranktest(res)
+# tau : T 통계량, tau^2 : T^2 통계량 // 효과크기의 연구간 변동을 나타내는 분산 tau^2, tau의 추정량이 T^2, T 
+
+# 6.1.3 에거 검정
+regtest(res)
+# 개별 연구 효과크기 Yi, 효과크기의 표준오차 si, 반응변수를 zi(=Yi/si), 설명변수를 si의 역수인 정밀도 preci(1/si) 정의
+# 회귀모형 -> E[zi] = B0 + B1*preci
+# 가설 : H0 : B0 = 0
+# 깔때기 그림이 대칭이라면 회귀선은 원점을 지나게 된다(B0 = 0)
+# 기울기 B1은 효과크기의 방향과 크기를 나타낸다 
+
+## 6.2 전체 효과크기에 미치는 영향 평가
+# 6.2.1 trim-and-fill 방법
+res <- rma(yi = yi, vi = vi, data = hs, measure = "OR", method = "FE") 
+trimfill(res, estimator = "R0") 
+trimfill(res) 
+
+trimfill(res, estimator="R0") %>% funnel(atransf = exp, xlab = "Odds Ratio", at = log(c(.25, .5, 1, 2, 4)), legend = TRUE, refline2 = 0)
+# 하얀색 원이 결측된 연구의 수
+
+install.packages("meta")
+library(meta)
+
+meta::metagen(yi, sqrt(vi), study, data = hs, sm = "OR") %>% summary()
+# 통합추정치 :1.2041 
+
+meta::metagen(yi, sqrt(vi), study, data = hs, sm = "OR") %>% trimfill() %>% summary()
+# 조정 통합 추정치 : 1.1883
+
+# 6.2.3 누적 메타분석
+data(dat.hackshaw1998)
+hs <- dat.hackshaw1998
+
+rma(yi = yi, vi = vi, data = hs, measure = "OR", method = "FE", slab = paste(author, year, sep = ",")) %>% cumul(order(hs$cases, decreasing = TRUE)) %>% 
+  forest(at = log(c(.75, 1, 2)), atransf = exp, cex = .75, xlab = "Odds Ratio")
+
